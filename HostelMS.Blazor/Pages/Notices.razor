@@ -1,0 +1,183 @@
+@page "/notices"
+@using HostelMS.Blazor.Services
+@using HostelMS.Blazor.Models
+@attribute [Authorize]
+@inject INoticeApiService NoticeSvc
+@inject IAuthService AuthSvc
+
+<PageTitle>Notice Board - HostelMS</PageTitle>
+
+<div class="page-content">
+    <div class="filters-bar">
+        <div style="flex:1"></div>
+        <button class="btn btn-primary" @onclick="OpenModal">📌 Post Notice</button>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_pageError))
+    {
+        <div class="alert alert-danger">⚠️ @_pageError</div>
+    }
+    @if (!string.IsNullOrEmpty(_successMsg))
+    {
+        <div class="alert alert-success">✅ @_successMsg</div>
+    }
+
+    @if (_loading)
+    {
+        <div class="loading-spinner"><div class="spinner"></div><span class="loading-text">Loading notices...</span></div>
+    }
+    else
+    {
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:18px">
+            @foreach (var n in _notices)
+            {
+                <div class="card" style="border-top:4px solid @GetNoticeColor(n.Type)">
+                    <div class="card-header">
+                        <div>
+                            <span class="badge @GetNoticeBadge(n.Type)" style="margin-bottom:6px;display:inline-block">@n.Type</span>
+                            <div class="card-title">@n.Title</div>
+                        </div>
+                        <button class="btn btn-danger btn-sm btn-icon" @onclick="() => Delete(n.Id)">🗑️</button>
+                    </div>
+                    <div class="card-body">
+                        <p style="color:var(--text-secondary);font-size:14px;line-height:1.6">@n.Content</p>
+                        <div style="margin-top:12px;display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted)">
+                            <span>📅 @n.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, HH:mm")</span>
+                            @if (n.ExpiresAt.HasValue)
+                            { <span>⏳ Expires: @n.ExpiresAt.Value.ToString("dd MMM")</span> }
+                        </div>
+                    </div>
+                </div>
+            }
+            @if (!_notices.Any())
+            {
+                <div class="empty-state" style="grid-column:1/-1">
+                    <div class="empty-icon">📌</div>
+                    <p>No notices posted yet</p>
+                    <span>Click "Post Notice" to add one</span>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@if (_showModal)
+{
+    <div class="modal-overlay" @onclick="CloseModal">
+        <div class="modal" @onclick:stopPropagation>
+            <div class="modal-header">
+                <span class="modal-title">📌 Post Notice</span>
+                <button class="modal-close" @onclick="CloseModal">×</button>
+            </div>
+            <div class="modal-body">
+                @if (!string.IsNullOrEmpty(_error))
+                {
+                    <div class="alert alert-danger">⚠️ @_error</div>
+                }
+                <div class="form-group">
+                    <label class="form-label">Title *</label>
+                    <input @bind="_form.Title" class="form-control" placeholder="Enter notice title" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Content *</label>
+                    <textarea @bind="_form.Content" class="form-control" rows="4" placeholder="Enter notice content..."></textarea>
+                </div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Type</label>
+                        <select @bind="_form.Type" class="form-control">
+                            <option>General</option>
+                            <option>Urgent</option>
+                            <option>Event</option>
+                            <option>Maintenance</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Expires At (optional)</label>
+                        <input @bind="_form.ExpiresAt" type="date" class="form-control" />
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
+                <button class="btn btn-primary" @onclick="PostNotice" disabled="@_saving">
+                    @(_saving ? "Posting..." : "📌 Post Notice")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<NoticeDto> _notices = new();
+    private bool _loading = true, _showModal, _saving;
+    private CreateNoticeDto _form = new();
+    private string _error = "";
+    private string _pageError = "";
+    private string _successMsg = "";
+
+    void OpenModal() { _showModal = true; _error = ""; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Reload();
+        _loading = false;
+    }
+
+    async Task Reload()
+    {
+        try
+        {
+            _notices = await NoticeSvc.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            _pageError = $"Failed to load notices: {ex.Message}";
+        }
+    }
+
+    void CloseModal() { _showModal = false; _error = ""; }
+
+    async Task PostNotice()
+    {
+        if (string.IsNullOrWhiteSpace(_form.Title))
+        { _error = "Title is required."; return; }
+        if (string.IsNullOrWhiteSpace(_form.Content))
+        { _error = "Content is required."; return; }
+
+        _saving = true; _error = "";
+        try
+        {
+            var user = await AuthSvc.GetCurrentUserAsync();
+            _form.CreatedBy = user?.UserId ?? 1;
+            var result = await NoticeSvc.CreateAsync(_form);
+            if (result != null)
+            {
+                await Reload();
+                _form = new();
+                _showModal = false;
+                _successMsg = "Notice posted successfully!";
+                await Task.Delay(3000);
+                _successMsg = "";
+            }
+            else
+            {
+                _error = "Failed to post notice. Check API is running.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"Error: {ex.Message}";
+        }
+        _saving = false;
+    }
+
+    async Task Delete(int id)
+    {
+        await NoticeSvc.DeleteAsync(id);
+        await Reload();
+    }
+
+    string GetNoticeBadge(string t) => t switch { "Urgent" => "badge-danger", "Event" => "badge-info", "Maintenance" => "badge-warning", _ => "badge-purple" };
+    string GetNoticeColor(string t) => t switch { "Urgent" => "var(--danger)", "Event" => "var(--accent)", "Maintenance" => "var(--warning)", _ => "var(--primary)" };
+}

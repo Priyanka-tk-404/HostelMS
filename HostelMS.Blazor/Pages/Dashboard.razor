@@ -1,0 +1,161 @@
+@page "/"
+@using HostelMS.Blazor.Services
+@using HostelMS.Blazor.Models
+@attribute [Authorize]
+@inject IDashboardApiService DashboardSvc
+@inject INoticeApiService NoticeSvc
+
+<PageTitle>Dashboard - HostelMS</PageTitle>
+
+<div class="page-content">
+    @if (_loading)
+    {
+        <div class="loading-spinner"><div class="spinner"></div><span class="loading-text">Loading dashboard...</span></div>
+    }
+    else if (_stats != null)
+    {
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon violet">👨‍🎓</div>
+                <div>
+                    <div class="stat-value">@_stats.ActiveStudents</div>
+                    <div class="stat-label">Active Students</div>
+                    <div class="stat-sub">Total: @_stats.TotalStudents</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon blue">🏠</div>
+                <div>
+                    <div class="stat-value">@_stats.AvailableRooms</div>
+                    <div class="stat-label">Available Rooms</div>
+                    <div class="stat-sub">Total: @_stats.TotalRooms</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon green">✅</div>
+                <div>
+                    <div class="stat-value">@_stats.TodayPresent</div>
+                    <div class="stat-label">Today Present</div>
+                    <div class="stat-sub">QR / Manual</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon orange">🚪</div>
+                <div>
+                    <div class="stat-value">@_stats.TodayVisitors</div>
+                    <div class="stat-label">Today's Visitors</div>
+                    <div class="stat-sub">Currently Inside</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon red">📢</div>
+                <div>
+                    <div class="stat-value">@_stats.OpenComplaints</div>
+                    <div class="stat-label">Open Complaints</div>
+                    <div class="stat-sub">Need Attention</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon indigo">💰</div>
+                <div>
+                    <div class="stat-value">₹@_stats.TotalFeeCollected.ToString("N0")</div>
+                    <div class="stat-label">Fee Collected</div>
+                    <div class="stat-sub">Due: ₹@_stats.TotalFeeDue.ToString("N0")</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Row -->
+        <div class="dashboard-bottom">
+            <!-- Recent Complaints -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">📢 Recent Complaints</span>
+                    <a href="/complaints" class="btn btn-secondary btn-sm">View All</a>
+                </div>
+                <div class="card-body" style="padding:0">
+                    @if (_stats.RecentComplaints.Any())
+                    {
+                        @foreach (var c in _stats.RecentComplaints)
+                        {
+                            <div style="padding:14px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px">
+                                <div style="flex:1">
+                                    <div style="font-weight:600;font-size:14px">@c.Title</div>
+                                    <div style="font-size:12px;color:var(--text-secondary)">@c.StudentName · @c.Category</div>
+                                </div>
+                                <span class="badge @GetPriorityBadge(c.Priority)">@c.Priority</span>
+                                <span class="badge @GetStatusBadge(c.Status)">@c.Status</span>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="empty-state" style="padding:30px">
+                            <div class="empty-icon">✅</div>
+                            <p>No complaints</p>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Notices -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">📌 Notice Board</span>
+                    <a href="/notices" class="btn btn-secondary btn-sm">View All</a>
+                </div>
+                <div class="card-body" style="padding:0">
+                    @if (_stats.RecentNotices.Any())
+                    {
+                        @foreach (var n in _stats.RecentNotices)
+                        {
+                            <div style="padding:14px 22px;border-bottom:1px solid var(--border)">
+                                <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+                                    <span class="badge @GetNoticeBadge(n.Type)">@n.Type</span>
+                                    <span style="font-size:11px;color:var(--text-muted)">@n.CreatedAt.ToString("dd MMM")</span>
+                                </div>
+                                <div style="font-weight:600;font-size:14px">@n.Title</div>
+                                <div style="font-size:12px;color:var(--text-secondary);margin-top:2px">@(n.Content.Length > 80 ? n.Content[..80] + "…" : n.Content)</div>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="empty-state" style="padding:30px">
+                            <div class="empty-icon">📌</div>
+                            <p>No notices</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private DashboardStatsDto? _stats;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _stats = await DashboardSvc.GetStatsAsync();
+        _loading = false;
+    }
+
+    private string GetPriorityBadge(string p) => p switch
+    {
+        "Urgent" => "badge-danger", "High" => "badge-warning",
+        "Medium" => "badge-info", _ => "badge-gray"
+    };
+    private string GetStatusBadge(string s) => s switch
+    {
+        "Open" => "badge-danger", "InProgress" => "badge-warning",
+        "Resolved" => "badge-success", _ => "badge-gray"
+    };
+    private string GetNoticeBadge(string t) => t switch
+    {
+        "Urgent" => "badge-danger", "Event" => "badge-info",
+        "Maintenance" => "badge-warning", _ => "badge-purple"
+    };
+}

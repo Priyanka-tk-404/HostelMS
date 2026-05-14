@@ -1,0 +1,154 @@
+@* ─── Rooms Page ─────────────────────────────────────────────────────────────── *@
+@page "/rooms"
+@using HostelMS.Blazor.Services
+@using HostelMS.Blazor.Models
+@attribute [Authorize]
+@inject IRoomApiService RoomSvc
+
+<PageTitle>Rooms - HostelMS</PageTitle>
+
+<div class="page-content">
+    <div class="filters-bar">
+        <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input @bind="_search" @bind:event="oninput" class="form-control" placeholder="Search rooms..." />
+        </div>
+        <select @bind="_typeFilter" class="form-control" style="width:140px">
+            <option value="">All Types</option>
+            <option>Single</option><option>Double</option><option>Triple</option><option>Dormitory</option>
+        </select>
+        <select @bind="_statusFilter" class="form-control" style="width:150px">
+            <option value="">All Status</option>
+            <option>Available</option><option>Full</option><option>UnderMaintenance</option>
+        </select>
+        <button class="btn btn-primary" @onclick="() => OpenModal()">➕ Add Room</button>
+    </div>
+
+    <!-- Room Cards Grid -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px">
+        @foreach (var r in Filtered)
+        {
+            <div class="card" style="overflow:visible">
+                <div style="background:var(--gradient);padding:20px;border-radius:var(--radius) var(--radius) 0 0;position:relative">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                        <div>
+                            <div style="font-size:28px;font-weight:800;color:#fff">@r.RoomNumber</div>
+                            <div style="color:rgba(255,255,255,.8);font-size:13px">Floor @r.Floor</div>
+                        </div>
+                        <span class="badge @GetStatusBadge(r.Status)" style="font-size:11px">@r.Status</span>
+                    </div>
+                </div>
+                <div style="padding:18px">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:12px">
+                        <div><span class="badge badge-purple">@r.Type</span></div>
+                        <div style="font-weight:800;color:var(--primary);font-size:16px">₹@r.MonthlyFee<span style="font-size:11px;font-weight:400;color:var(--text-muted)">/mo</span></div>
+                    </div>
+                    <div style="background:var(--surface-2);border-radius:8px;padding:10px;margin-bottom:14px">
+                        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-secondary);margin-bottom:6px">
+                            <span>Occupancy</span>
+                            <span style="font-weight:700;color:var(--text-primary)">@r.OccupiedCount / @r.Capacity</span>
+                        </div>
+                        <div style="background:var(--border);border-radius:99px;height:6px">
+                            <div style="background:var(--gradient);height:6px;border-radius:99px;width:@(r.Capacity > 0 ? (int)((double)r.OccupiedCount/r.Capacity*100) : 0)%"></div>
+                        </div>
+                        <div style="font-size:11px;color:var(--success);margin-top:4px;font-weight:600">@r.AvailableSlots slot(s) available</div>
+                    </div>
+                    <div style="display:flex;gap:8px">
+                        <button class="btn btn-secondary btn-sm" style="flex:1;justify-content:center" @onclick="() => OpenModal(r)">✏️ Edit</button>
+                        <button class="btn btn-danger btn-sm btn-icon" @onclick="() => Delete(r.Id)">🗑️</button>
+                    </div>
+                </div>
+            </div>
+        }
+        @if (!Filtered.Any())
+        {
+            <div class="empty-state" style="grid-column:1/-1;padding:60px"><div class="empty-icon">🏠</div><p>No rooms found</p></div>
+        }
+    </div>
+</div>
+
+@if (_showModal)
+{
+    <div class="modal-overlay" @onclick="CloseModal">
+        <div class="modal" @onclick:stopPropagation>
+            <div class="modal-header">
+                <span class="modal-title">@(_editId > 0 ? "Edit Room" : "Add Room")</span>
+                <button class="modal-close" @onclick="CloseModal">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Room Number *</label>
+                        <input @bind="_form.RoomNumber" class="form-control" placeholder="e.g. 101" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Floor</label>
+                        <input @bind="_form.Floor" class="form-control" placeholder="e.g. Ground, 1st" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Type</label>
+                        <select @bind="_form.Type" class="form-control">
+                            <option>Single</option><option>Double</option><option>Triple</option><option>Dormitory</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Capacity</label>
+                        <input @bind="_form.Capacity" type="number" class="form-control" min="1" max="20" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Monthly Fee (₹)</label>
+                        <input @bind="_form.MonthlyFee" type="number" class="form-control" placeholder="2500" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Status</label>
+                        <select @bind="_form.Status" class="form-control">
+                            <option>Available</option><option>Full</option><option>UnderMaintenance</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="grid-column:1/-1">
+                        <label class="form-label">Amenities</label>
+                        <input @bind="_form.Amenities" class="form-control" placeholder="WiFi, AC, Attached Bathroom..." />
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
+                <button class="btn btn-primary" @onclick="Save">@(_editId > 0 ? "Update" : "Add Room")</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<RoomDto> _rooms = new();
+    private bool _loading = true;
+    private string _search = "", _typeFilter = "", _statusFilter = "";
+    private bool _showModal; private int _editId;
+    private CreateRoomDto _form = new();
+
+    private IEnumerable<RoomDto> Filtered => _rooms
+        .Where(r => (string.IsNullOrEmpty(_search) || r.RoomNumber.Contains(_search, StringComparison.OrdinalIgnoreCase))
+                 && (string.IsNullOrEmpty(_typeFilter) || r.Type == _typeFilter)
+                 && (string.IsNullOrEmpty(_statusFilter) || r.Status == _statusFilter));
+
+    protected override async Task OnInitializedAsync() { _rooms = await RoomSvc.GetAllAsync(); _loading = false; }
+
+    void OpenModal(RoomDto? r = null)
+    {
+        _editId = r?.Id ?? 0;
+        _form = r != null ? new CreateRoomDto { RoomNumber = r.RoomNumber, Floor = r.Floor, Type = r.Type, Capacity = r.Capacity, MonthlyFee = r.MonthlyFee, Status = r.Status, Amenities = r.Amenities } : new();
+        _showModal = true;
+    }
+    void CloseModal() => _showModal = false;
+
+    async Task Save()
+    {
+        if (_editId > 0) await RoomSvc.UpdateAsync(_editId, _form);
+        else await RoomSvc.CreateAsync(_form);
+        _rooms = await RoomSvc.GetAllAsync();
+        CloseModal();
+    }
+    async Task Delete(int id) { await RoomSvc.DeleteAsync(id); _rooms = await RoomSvc.GetAllAsync(); }
+
+    string GetStatusBadge(string s) => s switch { "Available" => "badge-success", "Full" => "badge-danger", _ => "badge-warning" };
+}

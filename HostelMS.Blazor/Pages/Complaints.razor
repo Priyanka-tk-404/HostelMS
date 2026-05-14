@@ -1,0 +1,248 @@
+@page "/complaints"
+@using HostelMS.Blazor.Services
+@using HostelMS.Blazor.Models
+@attribute [Authorize]
+@inject IComplaintApiService ComplaintSvc
+@inject IStudentApiService StudentSvc
+
+<PageTitle>Complaints - HostelMS</PageTitle>
+
+<div class="page-content">
+    <div class="filters-bar">
+        <div class="search-box" style="flex:1">
+            <span class="search-icon">🔍</span>
+            <input @bind="_search" @bind:event="oninput" class="form-control" placeholder="Search complaints..." />
+        </div>
+        <select @bind="_statusFilter" class="form-control" style="width:150px">
+            <option value="">All Status</option>
+            <option>Open</option><option>InProgress</option><option>Resolved</option><option>Closed</option>
+        </select>
+        <button class="btn btn-primary" @onclick="OpenCreateModal">➕ New Complaint</button>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_successMsg))
+    {
+        <div class="alert alert-success">✅ @_successMsg</div>
+    }
+
+    <div class="card">
+        @if (_loading)
+        {
+            <div class="loading-spinner"><div class="spinner"></div></div>
+        }
+        else
+        {
+            <div class="table-wrapper">
+                <table class="table">
+                    <thead>
+                        <tr><th>Title</th><th>Student</th><th>Category</th><th>Priority</th><th>Status</th><th>Date</th><th>Action</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var c in Filtered)
+                        {
+                            <tr>
+                                <td>
+                                    <div style="font-weight:600;max-width:200px">@c.Title</div>
+                                    <div style="font-size:11px;color:var(--text-muted)">@(c.Description.Length > 60 ? c.Description[..60] + "…" : c.Description)</div>
+                                </td>
+                                <td>@c.StudentName</td>
+                                <td><span class="badge badge-purple">@c.Category</span></td>
+                                <td><span class="badge @GetPriorityBadge(c.Priority)">@c.Priority</span></td>
+                                <td><span class="badge @GetStatusBadge(c.Status)">@c.Status</span></td>
+                                <td>@c.CreatedAt.ToLocalTime().ToString("dd MMM yyyy")</td>
+                                <td>
+                                    <div style="display:flex;gap:6px;flex-wrap:wrap">
+                                        @if (c.Status == "Open")
+                                        {
+                                            <button class="btn btn-warning btn-sm" @onclick="() => StartProgress(c.Id)">🔄 Progress</button>
+                                        }
+                                        @if (c.Status is "Open" or "InProgress")
+                                        {
+                                            <button class="btn btn-success btn-sm" @onclick="() => OpenResolve(c)">✅ Resolve</button>
+                                        }
+                                        @if (c.Status == "Resolved")
+                                        {
+                                            <span style="color:var(--success);font-size:12px">✅ Resolved</span>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                        @if (!Filtered.Any())
+                        {
+                            <tr><td colspan="7">
+                                <div class="empty-state"><div class="empty-icon">📢</div><p>No complaints found</p><span>Click "New Complaint" to add one</span></div>
+                            </td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- Create Modal -->
+@if (_showCreate)
+{
+    <div class="modal-overlay" @onclick="() => _showCreate = false">
+        <div class="modal" @onclick:stopPropagation>
+            <div class="modal-header">
+                <span class="modal-title">📢 New Complaint</span>
+                <button class="modal-close" @onclick="() => _showCreate = false">×</button>
+            </div>
+            <div class="modal-body">
+                @if (!string.IsNullOrEmpty(_error))
+                {
+                    <div class="alert alert-danger">⚠️ @_error</div>
+                }
+                <div class="form-group">
+                    <label class="form-label">Student *</label>
+                    <select @bind="_cForm.StudentId" class="form-control">
+                        <option value="0">-- Select Student --</option>
+                        @foreach (var s in _students)
+                        {
+                            <option value="@s.Id">@s.FullName (@s.StudentId)</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Title *</label>
+                    <input @bind="_cForm.Title" class="form-control" placeholder="Brief description of issue" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description *</label>
+                    <textarea @bind="_cForm.Description" class="form-control" rows="3" placeholder="Detailed description..."></textarea>
+                </div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Category</label>
+                        <select @bind="_cForm.Category" class="form-control">
+                            <option>Maintenance</option><option>Food</option><option>Security</option>
+                            <option>Housekeeping</option><option>Internet</option><option>Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Priority</label>
+                        <select @bind="_cForm.Priority" class="form-control">
+                            <option>Low</option><option>Medium</option><option>High</option><option>Urgent</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="() => _showCreate = false">Cancel</button>
+                <button class="btn btn-primary" @onclick="CreateComplaint" disabled="@_saving">
+                    @(_saving ? "Submitting..." : "Submit Complaint")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Resolve Modal -->
+@if (_showResolve && _resolveItem != null)
+{
+    <div class="modal-overlay" @onclick="() => _showResolve = false">
+        <div class="modal" style="max-width:440px" @onclick:stopPropagation>
+            <div class="modal-header">
+                <span class="modal-title">✅ Resolve Complaint</span>
+                <button class="modal-close" @onclick="() => _showResolve = false">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info" style="margin-bottom:16px">
+                    <strong>@_resolveItem.Title</strong><br/>
+                    <span style="font-size:12px">@_resolveItem.StudentName · @_resolveItem.Category</span>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Resolution Notes *</label>
+                    <textarea @bind="_resolutionText" class="form-control" rows="3" placeholder="Describe how this was resolved..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="() => _showResolve = false">Cancel</button>
+                <button class="btn btn-success" @onclick="SubmitResolve">✅ Mark as Resolved</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<ComplaintDto> _complaints = new();
+    private List<StudentDto> _students = new();
+    private bool _loading = true;
+    private string _search = "", _statusFilter = "";
+    private bool _showCreate, _saving;
+    private string _error = "", _successMsg = "";
+    private CreateComplaintDto _cForm = new();
+    private bool _showResolve;
+    private ComplaintDto? _resolveItem;
+    private string _resolutionText = "";
+
+    private IEnumerable<ComplaintDto> Filtered => _complaints
+        .Where(c => (string.IsNullOrEmpty(_search) ||
+                     c.Title.Contains(_search, StringComparison.OrdinalIgnoreCase) ||
+                     c.StudentName.Contains(_search, StringComparison.OrdinalIgnoreCase))
+                 && (string.IsNullOrEmpty(_statusFilter) || c.Status == _statusFilter));
+
+    void OpenCreateModal() { _showCreate = true; _error = ""; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _complaints = await ComplaintSvc.GetAllAsync();
+        _students = await StudentSvc.GetAllAsync();
+        _loading = false;
+    }
+
+    async Task CreateComplaint()
+    {
+        if (_cForm.StudentId == 0) { _error = "Please select a student."; return; }
+        if (string.IsNullOrWhiteSpace(_cForm.Title)) { _error = "Title is required."; return; }
+        if (string.IsNullOrWhiteSpace(_cForm.Description)) { _error = "Description is required."; return; }
+
+        _saving = true; _error = "";
+        try
+        {
+            var result = await ComplaintSvc.CreateAsync(_cForm);
+            if (result != null)
+            {
+                _complaints = await ComplaintSvc.GetAllAsync();
+                _cForm = new();
+                _showCreate = false;
+                _successMsg = "Complaint submitted successfully!";
+                await Task.Delay(3000);
+                _successMsg = "";
+            }
+            else
+            {
+                _error = "Failed to submit complaint. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"Error: {ex.Message}";
+        }
+        _saving = false;
+    }
+
+    void OpenResolve(ComplaintDto c) { _resolveItem = c; _resolutionText = ""; _showResolve = true; }
+
+    async Task SubmitResolve()
+    {
+        if (_resolveItem == null) return;
+        await ComplaintSvc.UpdateAsync(_resolveItem.Id, new UpdateComplaintDto { Status = "Resolved", Resolution = _resolutionText });
+        _complaints = await ComplaintSvc.GetAllAsync();
+        _showResolve = false;
+        _successMsg = "Complaint resolved!";
+        await Task.Delay(2000);
+        _successMsg = "";
+    }
+
+    async Task StartProgress(int id)
+    {
+        await ComplaintSvc.UpdateAsync(id, new UpdateComplaintDto { Status = "InProgress" });
+        _complaints = await ComplaintSvc.GetAllAsync();
+    }
+
+    string GetPriorityBadge(string p) => p switch { "Urgent" => "badge-danger", "High" => "badge-warning", "Medium" => "badge-info", _ => "badge-gray" };
+    string GetStatusBadge(string s) => s switch { "Open" => "badge-danger", "InProgress" => "badge-warning", "Resolved" => "badge-success", _ => "badge-gray" };
+}

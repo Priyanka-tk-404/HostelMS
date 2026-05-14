@@ -1,0 +1,243 @@
+@page "/fees"
+@using HostelMS.Blazor.Services
+@using HostelMS.Blazor.Models
+@attribute [Authorize]
+@inject IFeeApiService FeeSvc
+@inject IStudentApiService StudentSvc
+
+<PageTitle>Fee Management - HostelMS</PageTitle>
+
+<div class="page-content">
+    <div class="filters-bar">
+        <div class="search-box" style="flex:1">
+            <span class="search-icon">🔍</span>
+            <input @bind="_search" @bind:event="oninput" class="form-control" placeholder="Search by student name or ID..." />
+        </div>
+        <select @bind="_statusFilter" class="form-control" style="width:150px">
+            <option value="">All Status</option>
+            <option>Pending</option><option>Paid</option><option>PartiallyPaid</option><option>Overdue</option>
+        </select>
+        <button class="btn btn-primary" @onclick="() => _showCreate = true">➕ Add Fee</button>
+        <button class="btn btn-secondary" @onclick="() => _showBulk = true">📅 Bulk Generate</button>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="stats-grid" style="margin-bottom:22px">
+        <div class="stat-card">
+            <div class="stat-icon green">💰</div>
+            <div><div class="stat-value">₹@_fees.Sum(f => f.PaidAmount).ToString("N0")</div><div class="stat-label">Total Collected</div></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon red">⏳</div>
+            <div><div class="stat-value">₹@_fees.Where(f => f.Status is "Pending" or "Overdue").Sum(f => f.Balance).ToString("N0")</div><div class="stat-label">Total Due</div></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon orange">📋</div>
+            <div><div class="stat-value">@_fees.Count(f => f.Status == "Pending")</div><div class="stat-label">Pending Records</div></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon violet">✅</div>
+            <div><div class="stat-value">@_fees.Count(f => f.Status == "Paid")</div><div class="stat-label">Paid Records</div></div>
+        </div>
+    </div>
+
+    <div class="card">
+        @if (_loading)
+        {
+            <div class="loading-spinner"><div class="spinner"></div></div>
+        }
+        else
+        {
+            <div class="table-wrapper">
+                <table class="table">
+                    <thead>
+                        <tr><th>Student</th><th>Month</th><th>Amount</th><th>Paid</th><th>Balance</th><th>Due Date</th><th>Status</th><th>Actions</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var f in Filtered)
+                        {
+                            <tr>
+                                <td>
+                                    <div style="font-weight:600">@f.StudentName</div>
+                                    <div style="font-size:12px;color:var(--text-secondary)">@f.StudentRollNo</div>
+                                </td>
+                                <td>@f.Month</td>
+                                <td style="font-weight:600">₹@f.Amount.ToString("N0")</td>
+                                <td style="color:var(--success);font-weight:600">₹@f.PaidAmount.ToString("N0")</td>
+                                <td style="color:@(f.Balance > 0 ? "var(--danger)" : "var(--success)");font-weight:700">₹@f.Balance.ToString("N0")</td>
+                                <td>@f.DueDate.ToString("dd MMM yyyy")</td>
+                                <td><span class="badge @GetFeeStatusBadge(f.Status)">@f.Status</span></td>
+                                <td>
+                                    @if (f.Status != "Paid")
+                                    {
+                                        <button class="btn btn-success btn-sm" @onclick="() => OpenPay(f)">💳 Pay</button>
+                                    }
+                                    else
+                                    {
+                                        <span style="font-size:12px;color:var(--success)">✅ Paid @f.PaidDate?.ToString("dd MMM")</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- Add Fee Modal -->
+@if (_showCreate)
+{
+    <div class="modal-overlay" @onclick="() => _showCreate = false">
+        <div class="modal" @onclick:stopPropagation>
+            <div class="modal-header">
+                <span class="modal-title">➕ Add Fee Record</span>
+                <button class="modal-close" @onclick="() => _showCreate = false">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Student</label>
+                    <select @bind="_createForm.StudentId" class="form-control">
+                        <option value="0">-- Select Student --</option>
+                        @foreach (var s in _students)
+                        {
+                            <option value="@s.Id">@s.FullName (@s.StudentId)</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Amount (₹)</label>
+                        <input @bind="_createForm.Amount" type="number" class="form-control" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Type</label>
+                        <select @bind="_createForm.Type" class="form-control">
+                            <option>Monthly</option><option>Security</option><option>Maintenance</option><option>Miscellaneous</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Month (YYYY-MM)</label>
+                        <input @bind="_createForm.Month" class="form-control" placeholder="2024-01" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Due Date</label>
+                        <input @bind="_createForm.DueDate" type="date" class="form-control" />
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="() => _showCreate = false">Cancel</button>
+                <button class="btn btn-primary" @onclick="CreateFee">Create</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Pay Modal -->
+@if (_showPay && _payFee != null)
+{
+    <div class="modal-overlay" @onclick="() => _showPay = false">
+        <div class="modal" @onclick:stopPropagation>
+            <div class="modal-header">
+                <span class="modal-title">💳 Collect Payment — @_payFee.StudentName</span>
+                <button class="modal-close" @onclick="() => _showPay = false">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">Balance Due: <strong>₹@_payFee.Balance.ToString("N0")</strong></div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Amount to Pay (₹)</label>
+                        <input @bind="_payForm.PaidAmount" type="number" class="form-control" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Payment Mode</label>
+                        <select @bind="_payForm.PaymentMode" class="form-control">
+                            <option>Cash</option><option>UPI</option><option>Bank Transfer</option><option>Cheque</option><option>Card</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="grid-column:1/-1">
+                        <label class="form-label">Transaction ID</label>
+                        <input @bind="_payForm.TransactionId" class="form-control" placeholder="UTR / Reference number" />
+                    </div>
+                    <div class="form-group" style="grid-column:1/-1">
+                        <label class="form-label">Remarks</label>
+                        <input @bind="_payForm.Remarks" class="form-control" placeholder="Optional notes" />
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="() => _showPay = false">Cancel</button>
+                <button class="btn btn-success" @onclick="SubmitPayment">✅ Confirm Payment</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Bulk Generate Modal -->
+@if (_showBulk)
+{
+    <div class="modal-overlay" @onclick="() => _showBulk = false">
+        <div class="modal" style="max-width:400px" @onclick:stopPropagation>
+            <div class="modal-header">
+                <span class="modal-title">📅 Bulk Generate Monthly Fees</span>
+                <button class="modal-close" @onclick="() => _showBulk = false">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">This will create fee records for all active students for the selected month.</div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Month (YYYY-MM)</label>
+                        <input @bind="_bulkMonth" class="form-control" placeholder="2024-01" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Year</label>
+                        <input @bind="_bulkYear" type="number" class="form-control" />
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="() => _showBulk = false">Cancel</button>
+                <button class="btn btn-primary" @onclick="BulkGenerate">Generate</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<FeeRecordDto> _fees = new();
+    private List<StudentDto> _students = new();
+    private bool _loading = true;
+    private string _search = "", _statusFilter = "";
+
+    private bool _showCreate;
+    private CreateFeeDto _createForm = new();
+
+    private bool _showPay;
+    private FeeRecordDto? _payFee;
+    private PayFeeDto _payForm = new();
+
+    private bool _showBulk;
+    private string _bulkMonth = DateTime.Today.ToString("yyyy-MM");
+    private int _bulkYear = DateTime.Today.Year;
+
+    private IEnumerable<FeeRecordDto> Filtered => _fees
+        .Where(f => (string.IsNullOrEmpty(_search) || f.StudentName.Contains(_search, StringComparison.OrdinalIgnoreCase) || f.StudentRollNo.Contains(_search, StringComparison.OrdinalIgnoreCase))
+                 && (string.IsNullOrEmpty(_statusFilter) || f.Status == _statusFilter));
+
+    protected override async Task OnInitializedAsync()
+    {
+        _fees = await FeeSvc.GetAllAsync();
+        _students = await StudentSvc.GetAllAsync();
+        _loading = false;
+    }
+
+    void OpenPay(FeeRecordDto f) { _payFee = f; _payForm = new PayFeeDto { PaidAmount = f.Balance }; _showPay = true; }
+
+    async Task CreateFee() { await FeeSvc.CreateAsync(_createForm); _fees = await FeeSvc.GetAllAsync(); _showCreate = false; }
+    async Task SubmitPayment() { if (_payFee == null) return; await FeeSvc.PayAsync(_payFee.Id, _payForm); _fees = await FeeSvc.GetAllAsync(); _showPay = false; }
+    async Task BulkGenerate() { await FeeSvc.BulkGenerateAsync(_bulkMonth, _bulkYear); _fees = await FeeSvc.GetAllAsync(); _showBulk = false; }
+
+    string GetFeeStatusBadge(string s) => s switch { "Paid" => "badge-success", "Pending" => "badge-warning", "Overdue" => "badge-danger", "PartiallyPaid" => "badge-info", _ => "badge-gray" };
+}
