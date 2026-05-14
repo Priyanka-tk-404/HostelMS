@@ -1,0 +1,81 @@
+@page "/login"
+@using HostelMS.Blazor.Services
+@inject IAuthService AuthService
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthState
+@layout EmptyLayout
+
+<PageTitle>Login - HostelMS</PageTitle>
+
+<div class="login-page">
+    <div class="login-card">
+        <div class="login-logo">
+            <div class="logo-circle">🏠</div>
+            <h1>HostelMS</h1>
+            <p>Smart Hostel Management System</p>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_errorMsg))
+        {
+            <div class="alert alert-danger">⚠️ @_errorMsg</div>
+        }
+
+        <div class="form-group">
+            <label class="form-label">Email Address</label>
+            <input @bind="_email" @bind:event="oninput" @onkeypress="OnKeyPress"
+                   type="email" class="form-control" placeholder="admin@hostelms.com" />
+        </div>
+        <div class="form-group">
+            <label class="form-label">Password</label>
+            <input @bind="_password" @bind:event="oninput" @onkeypress="OnKeyPress"
+                   type="password" class="form-control" placeholder="••••••••" />
+        </div>
+
+        <button class="btn btn-primary w-full" style="justify-content:center;font-size:15px;padding:12px"
+                @onclick="DoLogin" disabled="@_loading">
+            @if (_loading)
+            { <span>🔄 Signing in...</span> }
+            else
+            { <span>🔐 Sign In</span> }
+        </button>
+
+        <div style="margin-top:24px;padding:16px;background:var(--surface-2);border-radius:var(--radius-sm);font-size:12px;color:var(--text-secondary)">
+            <strong>Demo Credentials:</strong><br />
+            Email: <code>admin@hostelms.com</code><br />
+            Password: <code>Admin@123</code>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string _email = "";
+    private string _password = "";
+    private string _errorMsg = "";
+    private bool _loading = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthState.GetAuthenticationStateAsync();
+        if (state.User.Identity?.IsAuthenticated == true)
+            Nav.NavigateTo("/");
+    }
+
+    private async Task DoLogin()
+    {
+        if (string.IsNullOrWhiteSpace(_email) || string.IsNullOrWhiteSpace(_password))
+        {
+            _errorMsg = "Please enter email and password.";
+            return;
+        }
+        _loading = true; _errorMsg = "";
+        var (success, msg) = await AuthService.LoginAsync(_email, _password);
+        _loading = false;
+        if (success) Nav.NavigateTo("/");
+        else _errorMsg = msg;
+    }
+
+    private async Task OnKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await DoLogin();
+    }
+}

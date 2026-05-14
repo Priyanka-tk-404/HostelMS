@@ -1,0 +1,118 @@
+@page "/attendance"
+@using HostelMS.Blazor.Services
+@using HostelMS.Blazor.Models
+@attribute [Authorize]
+@inject IAttendanceApiService AttSvc
+@inject IStudentApiService StudentSvc
+
+<PageTitle>Attendance - HostelMS</PageTitle>
+
+<div class="page-content">
+    <div class="filters-bar">
+        <input @bind="_dateFilter" @bind:event="oninput" @bind:format="yyyy-MM-dd" type="date" class="form-control" style="width:180px" />
+        <button class="btn btn-secondary" @onclick="Reload">🔄 Refresh</button>
+    </div>
+
+    <!-- Today Summary -->
+    <div class="stats-grid" style="margin-bottom:22px">
+        <div class="stat-card">
+            <div class="stat-icon green">✅</div>
+            <div><div class="stat-value">@_records.Count(r => r.Status == "Present")</div><div class="stat-label">Present</div></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon red">❌</div>
+            <div><div class="stat-value">@_records.Count(r => r.Status == "Absent")</div><div class="stat-label">Absent</div></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon orange">⏰</div>
+            <div><div class="stat-value">@_records.Count(r => r.Status == "Late")</div><div class="stat-label">Late</div></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon blue">📋</div>
+            <div><div class="stat-value">@_records.Count</div><div class="stat-label">Total Marked</div></div>
+        </div>
+    </div>
+
+    <div class="attendance-layout">
+        <!-- Attendance List -->
+        <div class="card">
+            <div class="card-header"><span class="card-title">📋 Attendance Records</span></div>
+            <div class="table-wrapper">
+                <table class="table">
+                    <thead><tr><th>Student</th><th>Type</th><th>Status</th><th>In Time</th><th>Out Time</th></tr></thead>
+                    <tbody>
+                        @foreach (var a in _records)
+                        {
+                            <tr>
+                                <td><div style="font-weight:600">@a.StudentName</div><div style="font-size:12px;color:var(--text-secondary)">@a.StudentRollNo</div></td>
+                                <td><span class="badge @(a.Type == "QR" ? "badge-purple" : "badge-info")">@a.Type</span></td>
+                                <td><span class="badge @GetStatusBadge(a.Status)">@a.Status</span></td>
+                                <td>@(a.InTime.HasValue ? a.InTime.Value.ToString("HH:mm") : "—")</td>
+                                <td>@(a.OutTime.HasValue ? a.OutTime.Value.ToString("HH:mm") : "—")</td>
+                            </tr>
+                        }
+                        @if (!_records.Any()) { <tr><td colspan="5"><div class="empty-state"><div class="empty-icon">📋</div><p>No records for this date</p></div></td></tr> }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Manual Mark Panel -->
+        <div class="card" style="height:fit-content">
+            <div class="card-header"><span class="card-title">✏️ Mark Manual</span></div>
+            <div class="card-body">
+                <div class="form-group">
+                    <label class="form-label">Student</label>
+                    <select @bind="_selStudentId" class="form-control">
+                        <option value="0">-- Select --</option>
+                        @foreach (var s in _students) { <option value="@s.Id">@s.FullName</option> }
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Status</label>
+                    <select @bind="_selStatus" class="form-control">
+                        <option>Present</option><option>Absent</option><option>Late</option><option>OnLeave</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Remarks</label>
+                    <input @bind="_remarks" class="form-control" placeholder="Optional" />
+                </div>
+                <button class="btn btn-primary w-full" style="justify-content:center" @onclick="MarkManual" disabled="@(_selStudentId == 0)">✅ Mark Attendance</button>
+
+                @if (!string.IsNullOrEmpty(_successMsg))
+                {
+                    <div class="alert alert-success mt-2">@_successMsg</div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<AttendanceDto> _records = new();
+    private List<StudentDto> _students = new();
+    private DateTime _dateFilter = DateTime.Today;
+    private int _selStudentId;
+    private string _selStatus = "Present";
+    private string _remarks = "";
+    private string _successMsg = "";
+
+    protected override async Task OnInitializedAsync() { await Reload(); _students = await StudentSvc.GetAllAsync(); }
+
+    async Task Reload()
+    {
+        _records = await AttSvc.GetAllAsync(_dateFilter);
+    }
+
+    async Task MarkManual()
+    {
+        var r = await AttSvc.MarkManualAsync(_selStudentId, _selStatus, string.IsNullOrEmpty(_remarks) ? null : _remarks);
+        if (r != null) { _successMsg = $"✅ {r.StudentName} marked {r.Status}"; await Reload(); }
+        _selStudentId = 0; _remarks = "";
+        await Task.Delay(2000);
+        _successMsg = "";
+    }
+
+    string GetStatusBadge(string s) => s switch { "Present" => "badge-success", "Absent" => "badge-danger", "Late" => "badge-warning", "OnLeave" => "badge-info", _ => "badge-gray" };
+}

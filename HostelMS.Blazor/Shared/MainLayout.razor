@@ -1,0 +1,125 @@
+@using Microsoft.AspNetCore.Components.Authorization
+@using HostelMS.Blazor.Services
+@using HostelMS.Blazor.Models
+@inherits LayoutComponentBase
+@inject IAuthService AuthService
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthState
+
+<AuthorizeView>
+    <Authorized>
+        <div class="app-layout">
+            <!-- Sidebar Overlay (mobile) -->
+            <div class="sidebar-overlay @(_sidebarOpen ? "show" : "")" @onclick="CloseSidebar"></div>
+
+            <!-- Sidebar -->
+            <aside class="sidebar @(_sidebarOpen ? "open" : "")">
+                <div class="sidebar-logo">
+                    <div class="logo-icon">🏠</div>
+                    <h2>HostelMS</h2>
+                    <span>Smart Management System</span>
+                </div>
+
+                <nav class="sidebar-nav">
+                    <div class="nav-section-label">Overview</div>
+                    <NavLink class="nav-item" href="/" Match="NavLinkMatch.All" @onclick="CloseSidebar">
+                        <span class="nav-icon">📊</span> Dashboard
+                    </NavLink>
+
+                    <div class="nav-section-label">Management</div>
+                    <NavLink class="nav-item" href="/students" @onclick="CloseSidebar">
+                        <span class="nav-icon">👨‍🎓</span> Students
+                    </NavLink>
+                    <NavLink class="nav-item" href="/rooms" @onclick="CloseSidebar">
+                        <span class="nav-icon">🏠</span> Rooms
+                    </NavLink>
+                    <NavLink class="nav-item" href="/fees" @onclick="CloseSidebar">
+                        <span class="nav-icon">💰</span> Fee Management
+                    </NavLink>
+
+                    <div class="nav-section-label">Daily Ops</div>
+                    <NavLink class="nav-item" href="/attendance" @onclick="CloseSidebar">
+                        <span class="nav-icon">📋</span> Attendance
+                    </NavLink>
+                    <NavLink class="nav-item" href="/visitors" @onclick="CloseSidebar">
+                        <span class="nav-icon">🚪</span> Visitor Log
+                    </NavLink>
+                    <NavLink class="nav-item" href="/complaints" @onclick="CloseSidebar">
+                        <span class="nav-icon">📢</span> Complaints
+                    </NavLink>
+
+                    <div class="nav-section-label">Communication</div>
+                    <NavLink class="nav-item" href="/notices" @onclick="CloseSidebar">
+                        <span class="nav-icon">📌</span> Notice Board
+                    </NavLink>
+                    <NavLink class="nav-item" href="/qr-scanner" @onclick="CloseSidebar">
+                        <span class="nav-icon">📱</span> QR Scanner
+                    </NavLink>
+                </nav>
+
+                <div class="sidebar-footer">
+                    <div class="user-info">
+                        <div class="user-avatar">@_initials</div>
+                        <div>
+                            <div class="user-name">@_userName</div>
+                            <div class="user-role">@_userRole</div>
+                        </div>
+                    </div>
+                    <button class="btn btn-secondary w-full mt-1" style="justify-content:center" @onclick="Logout">
+                        🚪 Logout
+                    </button>
+                </div>
+            </aside>
+
+            <!-- Main -->
+            <div class="main-content">
+                <header class="topbar">
+                    <button class="hamburger-btn" @onclick="ToggleSidebar">☰</button>
+                    <div class="topbar-title">@_pageTitle</div>
+                    <div class="topbar-actions">
+                        <span style="font-size:12px;color:var(--text-secondary)">@DateTime.Now.ToString("ddd, dd MMM yyyy")</span>
+                    </div>
+                </header>
+                <main>
+                    <CascadingValue Value="this" Name="Layout">
+                        @Body
+                    </CascadingValue>
+                </main>
+            </div>
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        <RedirectToLogin />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private string _userName = "Admin";
+    private string _userRole = "Administrator";
+    private string _initials = "A";
+    private bool _sidebarOpen = false;
+    public string _pageTitle = "Dashboard";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = await AuthService.GetCurrentUserAsync();
+        if (user != null)
+        {
+            _userName = user.FullName;
+            _userRole = user.Role.ToString();
+            _initials = string.Join("", user.FullName.Split(' ').Take(2).Select(w => w[0].ToString().ToUpper()));
+            // Ensure token is always attached
+            await AuthService.EnsureTokenAttached();
+        }
+    }
+
+    public void SetTitle(string title) { _pageTitle = title; StateHasChanged(); }
+    private void ToggleSidebar() => _sidebarOpen = !_sidebarOpen;
+    private void CloseSidebar() => _sidebarOpen = false;
+
+    private async Task Logout()
+    {
+        await AuthService.LogoutAsync();
+        Nav.NavigateTo("/login", true);
+    }
+}

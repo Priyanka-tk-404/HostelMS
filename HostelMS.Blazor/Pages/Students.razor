@@ -1,0 +1,308 @@
+@page "/students"
+@using HostelMS.Blazor.Services
+@using HostelMS.Blazor.Models
+@attribute [Authorize]
+@inject IStudentApiService StudentSvc
+@inject IRoomApiService RoomSvc
+
+<PageTitle>Students - HostelMS</PageTitle>
+
+<div class="page-content">
+    <div class="filters-bar">
+        <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input @bind="_search" @bind:event="oninput" class="form-control" placeholder="Search students..." />
+        </div>
+        <select @bind="_statusFilter" class="form-control" style="width:150px">
+            <option value="">All Status</option>
+            <option>Active</option><option>Inactive</option><option>Graduated</option><option>Suspended</option>
+        </select>
+        <button class="btn btn-primary" @onclick="() => OpenModal()">➕ Add Student</button>
+    </div>
+
+    <div class="card">
+        @if (_loading)
+        {
+            <div class="loading-spinner"><div class="spinner"></div></div>
+        }
+        else if (!Filtered.Any())
+        {
+            <div class="empty-state"><div class="empty-icon">👨‍🎓</div><p>No students found</p></div>
+        }
+        else
+        {
+            <div class="table-wrapper">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Student</th><th>ID</th><th>Department</th>
+                            <th>Room</th><th>Joining Date</th><th>Status</th><th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var s in Filtered)
+                        {
+                            <tr>
+                                <td>
+                                    <div style="display:flex;align-items:center;gap:10px">
+                                        <div class="avatar-sm">@(s.FullName[0].ToString().ToUpper())</div>
+                                        <div>
+                                            <div style="font-weight:600">@s.FullName</div>
+                                            <div style="font-size:12px;color:var(--text-secondary)">@s.Email</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><code style="background:var(--surface-3);padding:2px 8px;border-radius:4px;font-size:12px">@s.StudentId</code></td>
+                                <td>@(s.Department ?? "—") <span style="color:var(--text-muted);font-size:12px">@s.Year</span></td>
+                                <td>@if (s.RoomNumber != null) { <text>Room @s.RoomNumber</text> } else { <span style="color:var(--text-muted)">Unassigned</span> }</td>
+                                <td>@s.JoiningDate.ToString("dd MMM yyyy")</td>
+                                <td><span class="badge @GetStatusBadge(s.Status)">@s.Status</span></td>
+                                <td>
+                                    <div style="display:flex;gap:6px">
+                                        <button class="btn btn-secondary btn-sm" @onclick="() => ShowQR(s)" title="QR Code">📱</button>
+                                        <button class="btn btn-info btn-sm" @onclick="() => OpenModal(s)" title="Edit">✏️</button>
+                                        <button class="btn btn-warning btn-sm" @onclick="() => OpenAllocate(s)" title="Allocate Room">🏠</button>
+                                        <button class="btn btn-danger btn-sm" @onclick="() => Delete(s.Id)" title="Delete">🗑️</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- Add/Edit Modal -->
+@if (_showModal)
+{
+    <div class="modal-overlay" @onclick="CloseModal">
+        <div class="modal modal-lg" @onclick:stopPropagation>
+            <div class="modal-header">
+                <span class="modal-title">@(_editId > 0 ? "Edit Student" : "Add New Student")</span>
+                <button class="modal-close" @onclick="CloseModal">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Full Name *</label>
+                        <input @bind="_form.FullName" class="form-control" placeholder="Enter full name" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Email *</label>
+                        <input @bind="_form.Email" type="email" class="form-control" placeholder="email@example.com" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Phone</label>
+                        <input @bind="_form.Phone" class="form-control" placeholder="Mobile number" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Department</label>
+                        <input @bind="_form.Department" class="form-control" placeholder="e.g. Computer Science" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Year</label>
+                        <select @bind="_form.Year" class="form-control">
+                            <option value="">Select Year</option>
+                            <option>1st Year</option><option>2nd Year</option>
+                            <option>3rd Year</option><option>4th Year</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Joining Date</label>
+                        <input @bind="_form.JoiningDate" type="date" class="form-control" />
+                    </div>
+                    <div class="form-group" style="grid-column:1/-1">
+                        <label class="form-label">Address</label>
+                        <textarea @bind="_form.Address" class="form-control" rows="2" placeholder="Home address"></textarea>
+                    </div>
+                </div>
+                <div style="font-weight:700;font-size:13px;margin:16px 0 10px;padding-top:16px;border-top:1px solid var(--border)">Guardian Information</div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Guardian Name</label>
+                        <input @bind="_form.GuardianName" class="form-control" placeholder="Parent/Guardian name" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Guardian Phone</label>
+                        <input @bind="_form.GuardianPhone" class="form-control" placeholder="Guardian mobile" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Relation</label>
+                        <input @bind="_form.GuardianRelation" class="form-control" placeholder="e.g. Father, Mother" />
+                    </div>
+                    @if (_editId == 0)
+                    {
+                        <div class="form-group">
+                            <label class="form-label">Initial Password</label>
+                            <input @bind="_form.Password" type="password" class="form-control" placeholder="Min 8 characters" />
+                        </div>
+                    }
+                </div>
+                @if (!string.IsNullOrEmpty(_modalError))
+                {
+                    <div class="alert alert-danger">@_modalError</div>
+                }
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
+                <button class="btn btn-primary" @onclick="Save" disabled="@_saving">
+                    @(_saving ? "Saving..." : (_editId > 0 ? "Update Student" : "Add Student"))
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- QR Modal -->
+@if (_showQR && _qrStudent != null)
+{
+    <div class="modal-overlay" @onclick="() => _showQR = false">
+        <div class="modal" style="max-width:380px" @onclick:stopPropagation>
+            <div class="modal-header">
+                <span class="modal-title">📱 Student QR Code</span>
+                <button class="modal-close" @onclick="() => _showQR = false">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="qr-container">
+                    @if (!string.IsNullOrEmpty(_qrStudent.QRCode))
+                    {
+                        <img src="@_qrStudent.QRCode" alt="QR Code" />
+                    }
+                    else
+                    {
+                        <div style="width:180px;height:180px;background:var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;margin:0 auto;font-size:40px">📱</div>
+                    }
+                    <div class="qr-id">@_qrStudent.StudentId</div>
+                    <div class="qr-name">@_qrStudent.FullName</div>
+                    @if (!string.IsNullOrEmpty(_qrStudent.RoomNumber))
+                    {
+                        <div style="margin-top:8px"><span class="badge badge-purple">Room @_qrStudent.RoomNumber</span></div>
+                    }
+                </div>
+                <div style="margin-top:16px;display:flex;gap:10px">
+                    <button class="btn btn-primary w-full" style="justify-content:center" @onclick="RegenerateQR">🔄 Regenerate QR</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Allocate Room Modal -->
+@if (_showAllocate && _allocateStudent != null)
+{
+    <div class="modal-overlay" @onclick="() => _showAllocate = false">
+        <div class="modal" style="max-width:440px" @onclick:stopPropagation>
+            <div class="modal-header">
+                <span class="modal-title">🏠 Allocate Room — @_allocateStudent.FullName</span>
+                <button class="modal-close" @onclick="() => _showAllocate = false">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Select Room</label>
+                    <select @bind="_selectedRoomId" class="form-control">
+                        <option value="0">-- Choose Room --</option>
+                        @foreach (var r in _rooms.Where(r => r.AvailableSlots > 0))
+                        {
+                            <option value="@r.Id">Room @r.RoomNumber — @r.Type — Floor @r.Floor — ₹@r.MonthlyFee/mo — @r.AvailableSlots slots left</option>
+                        }
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="() => _showAllocate = false">Cancel</button>
+                <button class="btn btn-primary" @onclick="AllocateRoom" disabled="@(_selectedRoomId == 0)">Allocate</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<StudentDto> _students = new();
+    private List<RoomDto> _rooms = new();
+    private bool _loading = true;
+    private string _search = "";
+    private string _statusFilter = "";
+
+    private bool _showModal, _saving;
+    private int _editId;
+    private string _modalError = "";
+    private CreateStudentDto _form = new();
+
+    private bool _showQR;
+    private StudentDto? _qrStudent;
+
+    private bool _showAllocate;
+    private StudentDto? _allocateStudent;
+    private int _selectedRoomId;
+
+    private IEnumerable<StudentDto> Filtered => _students
+        .Where(s => (string.IsNullOrEmpty(_search) || s.FullName.Contains(_search, StringComparison.OrdinalIgnoreCase) || s.StudentId.Contains(_search, StringComparison.OrdinalIgnoreCase) || s.Email.Contains(_search, StringComparison.OrdinalIgnoreCase))
+                 && (string.IsNullOrEmpty(_statusFilter) || s.Status == _statusFilter));
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Reload();
+        _rooms = await RoomSvc.GetAllAsync();
+        _loading = false;
+    }
+
+    async Task Reload() { _students = await StudentSvc.GetAllAsync(); }
+
+    void OpenModal(StudentDto? s = null)
+    {
+        _editId = s?.Id ?? 0;
+        _form = s != null
+            ? new CreateStudentDto { FullName = s.FullName, Email = s.Email, Phone = s.Phone, Department = s.Department, Year = s.Year, JoiningDate = s.JoiningDate, GuardianName = s.GuardianName, GuardianPhone = s.GuardianPhone }
+            : new CreateStudentDto();
+        _modalError = "";
+        _showModal = true;
+    }
+    void CloseModal() { _showModal = false; }
+
+    async Task Save()
+    {
+        if (string.IsNullOrWhiteSpace(_form.FullName) || string.IsNullOrWhiteSpace(_form.Email))
+        { _modalError = "Name and Email are required."; return; }
+
+        _saving = true;
+        if (_editId > 0) await StudentSvc.UpdateAsync(_editId, _form);
+        else await StudentSvc.CreateAsync(_form);
+        await Reload();
+        _saving = false;
+        CloseModal();
+    }
+
+    async Task Delete(int id)
+    {
+        await StudentSvc.DeleteAsync(id);
+        await Reload();
+    }
+
+    void ShowQR(StudentDto s) { _qrStudent = s; _showQR = true; }
+
+    async Task RegenerateQR()
+    {
+        if (_qrStudent == null) return;
+        var qr = await StudentSvc.RegenerateQRAsync(_qrStudent.Id);
+        if (!string.IsNullOrEmpty(qr)) { _qrStudent.QRCode = qr; await Reload(); }
+    }
+
+    void OpenAllocate(StudentDto s) { _allocateStudent = s; _selectedRoomId = 0; _showAllocate = true; }
+
+    async Task AllocateRoom()
+    {
+        if (_allocateStudent == null || _selectedRoomId == 0) return;
+        await StudentSvc.AllocateRoomAsync(_allocateStudent.Id, _selectedRoomId);
+        await Reload();
+        _rooms = await RoomSvc.GetAllAsync();
+        _showAllocate = false;
+    }
+
+    string GetStatusBadge(string s) => s switch
+    {
+        "Active" => "badge-success", "Inactive" => "badge-gray",
+        "Suspended" => "badge-danger", "Graduated" => "badge-info", _ => "badge-gray"
+    };
+}

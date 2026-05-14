@@ -1,0 +1,89 @@
+@* ─── Visitors ────────────────────────────────────────────────────────────── *@
+@page "/visitors"
+@using HostelMS.Blazor.Services
+@using HostelMS.Blazor.Models
+@attribute [Authorize]
+@inject IVisitorApiService VisitorSvc
+@inject IStudentApiService StudentSvc
+
+<PageTitle>Visitor Log - HostelMS</PageTitle>
+
+<div class="page-content">
+    <div class="filters-bar">
+        <input @bind="_dateFilter" @bind:event="oninput" @bind:format="yyyy-MM-dd" type="date" class="form-control" style="width:180px" />
+        <button class="btn btn-primary" @onclick="() => _showModal = true">➕ Check In Visitor</button>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">🚪 Visitor Log</span>
+            <span style="font-size:13px;color:var(--text-secondary)">@_visitors.Count(v => v.Status == "Inside") currently inside</span>
+        </div>
+        <div class="table-wrapper">
+            <table class="table">
+                <thead><tr><th>Visitor</th><th>Student</th><th>Room</th><th>Purpose</th><th>In Time</th><th>Out Time</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody>
+                    @foreach (var v in _visitors)
+                    {
+                        <tr>
+                            <td><div style="font-weight:600">@v.VisitorName</div><div style="font-size:12px;color:var(--text-secondary)">@v.VisitorPhone · @v.Relation</div></td>
+                            <td>@v.StudentName</td>
+                            <td>@(v.RoomNumber != null ? $"Room {v.RoomNumber}" : "—")</td>
+                            <td>@(v.Purpose ?? "—")</td>
+                            <td>@v.InTime.ToString("dd MMM HH:mm")</td>
+                            <td>@(v.OutTime.HasValue ? v.OutTime.Value.ToString("dd MMM HH:mm") : "—")</td>
+                            <td><span class="badge @(v.Status == "Inside" ? "badge-success" : "badge-gray")">@v.Status</span></td>
+                            <td>@if (v.Status == "Inside") { <button class="btn btn-warning btn-sm" @onclick="() => CheckOut(v.Id)">🚪 Check Out</button> }</td>
+                        </tr>
+                    }
+                    @if (!_visitors.Any()) { <tr><td colspan="8"><div class="empty-state"><div class="empty-icon">🚪</div><p>No visitor records</p></div></td></tr> }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@if (_showModal)
+{
+    <div class="modal-overlay" @onclick="() => _showModal = false">
+        <div class="modal" @onclick:stopPropagation>
+            <div class="modal-header"><span class="modal-title">🚪 Visitor Check-In</span><button class="modal-close" @onclick="() => _showModal = false">×</button></div>
+            <div class="modal-body">
+                <div class="form-grid">
+                    <div class="form-group"><label class="form-label">Visitor Name *</label><input @bind="_form.VisitorName" class="form-control" /></div>
+                    <div class="form-group"><label class="form-label">Phone</label><input @bind="_form.VisitorPhone" class="form-control" /></div>
+                    <div class="form-group"><label class="form-label">Student to Visit *</label>
+                        <select @bind="_form.StudentId" class="form-control">
+                            <option value="0">-- Select --</option>
+                            @foreach (var s in _students) { <option value="@s.Id">@s.FullName (@s.StudentId)</option> }
+                        </select>
+                    </div>
+                    <div class="form-group"><label class="form-label">Relation</label><input @bind="_form.Relation" class="form-control" placeholder="Parent, Friend..." /></div>
+                    <div class="form-group"><label class="form-label">ID Proof</label><input @bind="_form.IdProof" class="form-control" placeholder="Aadhaar / PAN..." /></div>
+                    <div class="form-group"><label class="form-label">Purpose</label><input @bind="_form.Purpose" class="form-control" /></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="() => _showModal = false">Cancel</button>
+                <button class="btn btn-primary" @onclick="CheckIn">✅ Check In</button>
+            </div>
+        </div>
+    </div>
+}
+@code {
+    private List<VisitorLogDto> _visitors = new();
+    private List<StudentDto> _students = new();
+    private DateTime _dateFilter = DateTime.Today;
+    private bool _showModal;
+    private CreateVisitorDto _form = new();
+
+    protected override async Task OnInitializedAsync() { await Reload(); _students = await StudentSvc.GetAllAsync(); }
+
+    async Task Reload()
+    {
+        _visitors = await VisitorSvc.GetAllAsync(_dateFilter);
+    }
+
+    async Task CheckIn() { await VisitorSvc.CheckInAsync(_form); await Reload(); _form = new(); _showModal = false; }
+    async Task CheckOut(int id) { await VisitorSvc.CheckOutAsync(id); await Reload(); }
+}
