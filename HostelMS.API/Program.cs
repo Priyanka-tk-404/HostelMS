@@ -79,6 +79,7 @@ using (var scope = app.Services.CreateScope())
 app.UseSwagger();
 app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "HostelMS API v1"));
 
+<<<<<<< HEAD
 // app.UseHttpsRedirection();
 app.UseCors("BlazorPolicy");
 app.UseAuthentication();
@@ -87,5 +88,11 @@ app.UseAuthorization();
 // Public health check endpoint for Railway
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", time = DateTime.UtcNow }));
 
+=======
+// app.UseHttpsRedirection();  // disabled for local dev
+app.UseCors("BlazorPolicy");
+app.UseAuthentication();
+app.UseAuthorization();
+>>>>>>> 5093825890e19118322800a0f5d7bc33b1ba7068
 app.MapControllers();
 app.Run();

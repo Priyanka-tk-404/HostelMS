@@ -10,7 +10,7 @@ builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
 // API base URL - HTTP for local dev
-builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri("http://localhost:7100/") });
+builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri("https://hostelms-production.up.railway.app/") });
 
 // Auth
 builder.Services.AddBlazoredLocalStorage();

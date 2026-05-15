@@ -1,0 +1,2 @@
+C:\Users\priya\Downloads\HostelMS_Complete (2)\HostelMS\HostelMS.Blazor\publish\emcc-props.json
+C:\Users\priya\Downloads\HostelMS_Complete (2)\HostelMS\HostelMS.Blazor\publish\web.config
