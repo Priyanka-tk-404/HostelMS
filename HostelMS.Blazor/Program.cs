@@ -19,7 +19,7 @@ builder.Services.AddScoped<AuthenticationStateProvider, JwtAuthStateProvider>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 
 // Feature services - all now receive ILocalStorageService for token attachment
-builder.Services.AddScoped<IStudentApiService, StudentApiService>();
+builder.Services.AddScoped<IcdStudentApiService, StudentApiService>();
 builder.Services.AddScoped<IRoomApiService, RoomApiService>();
 builder.Services.AddScoped<IFeeApiService, FeeApiService>();
 builder.Services.AddScoped<IVisitorApiService, VisitorApiService>();
