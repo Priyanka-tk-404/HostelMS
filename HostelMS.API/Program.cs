@@ -50,7 +50,10 @@ builder.Services.AddSwaggerGen(c =>
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Description = "JWT Authorization header using the Bearer scheme. Enter 'Bearer {token}'",
-        Name = "Authorization", In = ParameterLocation.Header, Type = SecuritySchemeType.ApiKey, Scheme = "Bearer"
+        Name = "Authorization",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.ApiKey,
+        Scheme = "Bearer"
     });
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
@@ -63,9 +66,10 @@ builder.Services.AddSwaggerGen(c =>
 
 // ─── CORS for Blazor ──────────────────────────────────────────────────────────
 builder.Services.AddCors(o => o.AddPolicy("BlazorPolicy", p =>
-    p.AllowAnyOrigin()
+    p.SetIsOriginAllowed(_ => true)
      .AllowAnyHeader()
-     .AllowAnyMethod()));
+     .AllowAnyMethod()
+     .AllowCredentials()));
 
 var app = builder.Build();
 
@@ -76,23 +80,17 @@ using (var scope = app.Services.CreateScope())
     db.Database.Migrate();
 }
 
+app.UseCors("BlazorPolicy");
+
 app.UseSwagger();
 app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "HostelMS API v1"));
 
-<<<<<<< HEAD
 // app.UseHttpsRedirection();
-app.UseCors("BlazorPolicy");
 app.UseAuthentication();
 app.UseAuthorization();
 
 // Public health check endpoint for Railway
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", time = DateTime.UtcNow }));
 
-=======
-// app.UseHttpsRedirection();  // disabled for local dev
-app.UseCors("BlazorPolicy");
-app.UseAuthentication();
-app.UseAuthorization();
->>>>>>> 5093825890e19118322800a0f5d7bc33b1ba7068
 app.MapControllers();
 app.Run();
