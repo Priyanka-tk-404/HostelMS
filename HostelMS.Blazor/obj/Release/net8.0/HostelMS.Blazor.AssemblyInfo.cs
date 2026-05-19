@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("HostelMS.Blazor")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+2badfa0e6a48957479bfd9d2a09e21ef4454ddf9")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+362b8685e0c52502b0f04bfd5d18fbf5a49c8c51")]
 [assembly: System.Reflection.AssemblyProductAttribute("HostelMS.Blazor")]
 [assembly: System.Reflection.AssemblyTitleAttribute("HostelMS.Blazor")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

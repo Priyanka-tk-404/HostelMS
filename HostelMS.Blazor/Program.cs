@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
-cd 
+
 // API base URL - HTTP for local dev
 builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri("https://hostelms-production.up.railway.app/") });
 
