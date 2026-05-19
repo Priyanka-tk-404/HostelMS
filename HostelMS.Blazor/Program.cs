@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
-
+cd 
 // API base URL - HTTP for local dev
 builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri("https://hostelms-production.up.railway.app/") });
 
@@ -19,7 +19,7 @@ builder.Services.AddScoped<AuthenticationStateProvider, JwtAuthStateProvider>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 
 // Feature services - all now receive ILocalStorageService for token attachment
-builder.Services.AddScoped<IcdStudentApiService, StudentApiService>();
+builder.Services.AddScoped<IStudentApiService, StudentApiService>();
 builder.Services.AddScoped<IRoomApiService, RoomApiService>();
 builder.Services.AddScoped<IFeeApiService, FeeApiService>();
 builder.Services.AddScoped<IVisitorApiService, VisitorApiService>();

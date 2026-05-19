@@ -1081,6 +1081,6 @@ C:\Users\priya\Downloads\HostelMS_Complete (2)\HostelMS\HostelMS.Blazor\obj\Rele
 C:\Users\priya\Downloads\HostelMS_Complete (2)\HostelMS\HostelMS.Blazor\obj\Release\net8.0\refint\HostelMS.Blazor.dll
 C:\Users\priya\Downloads\HostelMS_Complete (2)\HostelMS\HostelMS.Blazor\obj\Release\net8.0\HostelMS.Blazor.pdb
 C:\Users\priya\Downloads\HostelMS_Complete (2)\HostelMS\HostelMS.Blazor\obj\Release\net8.0\ref\HostelMS.Blazor.dll
-C:\Users\priya\Downloads\HostelMS_Complete (2)\HostelMS\HostelMS.Blazor\obj\Release\net8.0\compressed\8itkevh7d5-{0}-7jw4mejzhh-7jw4mejzhh.gz
-C:\Users\priya\Downloads\HostelMS_Complete (2)\HostelMS\HostelMS.Blazor\obj\Release\net8.0\compressed\o36t8vr1es-{0}-t59avjr356-t59avjr356.gz
-C:\Users\priya\Downloads\HostelMS_Complete (2)\HostelMS\HostelMS.Blazor\obj\Release\net8.0\compressed\gi18nj4mqo-{0}-vh47tq3aes-vh47tq3aes.gz
+C:\Users\priya\Downloads\HostelMS_Complete (2)\HostelMS\HostelMS.Blazor\obj\Release\net8.0\compressed\8itkevh7d5-{0}-steodk11pk-steodk11pk.gz
+C:\Users\priya\Downloads\HostelMS_Complete (2)\HostelMS\HostelMS.Blazor\obj\Release\net8.0\compressed\o36t8vr1es-{0}-0fbpk71wap-0fbpk71wap.gz
+C:\Users\priya\Downloads\HostelMS_Complete (2)\HostelMS\HostelMS.Blazor\obj\Release\net8.0\compressed\gi18nj4mqo-{0}-zdgy0avujr-zdgy0avujr.gz

@@ -11,7 +11,10 @@ var builder = WebApplication.CreateBuilder(args);
 // ─── Database ────────────────────────────────────────────────────────────────
 var connStr = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<HostelDbContext>(opt =>
-    opt.UseMySql(connStr, ServerVersion.AutoDetect(connStr)));
+    opt.UseMySql(
+        connStr,
+        new MySqlServerVersion(new Version(9, 7, 0))
+    ));
 
 // ─── JWT ─────────────────────────────────────────────────────────────────────
 var jwtKey = builder.Configuration["Jwt:Key"]!;
